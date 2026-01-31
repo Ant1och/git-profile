@@ -18,7 +18,7 @@ pub struct Config {
     #[serde(default = "IndexMap::new")]
     #[serde(skip_serializing_if = "IndexMap::is_empty")]
     #[serde_as(as = "IndexMap<_, _>")]
-    pub profile: ProfileMap
+    pub profile: ProfileMap,
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -76,19 +76,19 @@ pub trait Persist {
 
 impl Persist for AppConfigClient {
     fn load(&self) -> Result<Config> {
-        // Create the containing dir if not exists
-        let containing_dir = match self.path.parent() {
-            Some(parent_path) => parent_path,
-            None => return Err(anyhow!("The path {} has no parent.", &self.path.display())),
-        };
-        fs::create_dir_all(containing_dir)?;
-
-        // Create the file if not exists
-        fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(&self.path)
-            .with_context(|| format!("Can't open {}", &self.path.as_path().display()))?;
+        // Create config file and it's parent directory if they don't exist
+        if !fs::exists(&self.path)? {
+            let parent_dir = match self.path.parent() {
+                Some(parent_path) => parent_path,
+                None => return Err(anyhow!("The path {} has no parent.", &self.path.display())),
+            };
+            fs::create_dir_all(parent_dir)?;
+            fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&self.path)
+                .with_context(|| format!("Can't open {}", &self.path.as_path().display()))?;
+        }
 
         // Then, actually open the file for reading
         let mut file = fs::OpenOptions::new()
